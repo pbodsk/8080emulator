@@ -25,12 +25,25 @@ typedef struct State8080 {
    uint8_t  int_enable;
 } State8080;
 
-void UnimplementedInstruction(State8080 *state) {
+static void UnimplementedInstruction(State8080 *state) {
   printf("Error: Unimplemented instruction\n");
   exit(1);
 }
 
-int Emulate8080Op(State8080 *state) {
+static void ArithFlagsA(State8080 *state, uint16_t result) {
+  state->cc.z = ((result & 0xff) == 0);
+  state->cc.s = ((result & 0x80) != 0);
+  state->cc.cy = (result > 0xff);
+  //state->cc.p = Parity(result & 0xff);
+}
+
+static uint8_t ReadFromHL(State8080 *state) {
+  //OR h and l together to form a memory address
+  uint16_t offset = (state->h << 8) | state->l;
+  return state->memory[offset];
+}
+
+static int Emulate8080Op(State8080 *state) {
   //fetch the current opcode from memory
   unsigned char *opcode = &state->memory[state->pc];
 
@@ -262,43 +275,191 @@ int Emulate8080Op(State8080 *state) {
       //ADD C
       //The above can be condensed to this
       uint16_t answer = (uint16_t)state->a + (uint16_t)state->c;
-      state->cc.z = ((answer & 0xff) == 0);
-      state->cc.s = ((answer & 0x80) != 0);
-      state->cc.cy = (answer > 0xff);
-      //state->cc.p = Parity(answer & 0xff);
+      ArithFlagsA(state, answer);
       state->a = answer & 0xff;
     }
-    case 0x82: UnimplementedInstruction(state); break;
-    case 0x83: UnimplementedInstruction(state); break;
-    case 0x84: UnimplementedInstruction(state); break;
-    case 0x85: UnimplementedInstruction(state); break;
-    case 0x86: UnimplementedInstruction(state); break;
-    case 0x87: UnimplementedInstruction(state); break;
-    case 0x88: UnimplementedInstruction(state); break;
-    case 0x89: UnimplementedInstruction(state); break;
-    case 0x8a: UnimplementedInstruction(state); break;
-    case 0x8b: UnimplementedInstruction(state); break;
-    case 0x8c: UnimplementedInstruction(state); break;
-    case 0x8d: UnimplementedInstruction(state); break;
-    case 0x8e: UnimplementedInstruction(state); break;
-    case 0x8f: UnimplementedInstruction(state); break;
+    case 0x82: {
+      //ADD D
+      uint16_t answer = (uint16_t)state->a + (uint16_t)state->d;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x83: {
+      //ADD E
+      uint16_t answer = (uint16_t)state->a + (uint16_t)state->e;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x84: {
+      //ADD H
+      uint16_t answer = (uint16_t)state->a + (uint16_t)state->h;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x85: {
+      //ADD L
+      uint16_t answer = (uint16_t)state->a + (uint16_t)state->l;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x86: {
+      //ADD M
+      uint16_t answer = (uint16_t)state->a + (uint16_t)ReadFromHL(state);
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x87: {
+      //ADD A
+      uint16_t answer = (uint16_t)state->a + (uint16_t)state->a;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x88: {
+      //ADC B
+      uint16_t answer = (uint16_t)state->a + (uint16_t)state->b + (uint16_t)state->cc.cy ;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x89: {
+      //ADC C
+      uint16_t answer = (uint16_t)state->a + (uint16_t)state->c + (uint16_t)state->cc.cy ;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x8a: {
+      //ADC D
+      uint16_t answer = (uint16_t)state->a + (uint16_t)state->d + (uint16_t)state->cc.cy ;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x8b: {
+      //ADC E
+      uint16_t answer = (uint16_t)state->a + (uint16_t)state->e + (uint16_t)state->cc.cy ;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x8c: {
+      //ADC H
+      uint16_t answer = (uint16_t)state->a + (uint16_t)state->h + (uint16_t)state->cc.cy ;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x8d: {
+      //ADC L
+      uint16_t answer = (uint16_t)state->a + (uint16_t)state->l + (uint16_t)state->cc.cy ;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x8e: {
+      //ADC M
+      uint16_t answer = (uint16_t)state->a + (uint16_t)ReadFromHL(state) + (uint16_t)state->cc.cy ;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x8f: {
+      //ADC A
+      uint16_t answer = (uint16_t)state->a + (uint16_t)state->a + (uint16_t)state->cc.cy ;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
 
-    case 0x90: UnimplementedInstruction(state); break;
-    case 0x91: UnimplementedInstruction(state); break;
-    case 0x92: UnimplementedInstruction(state); break;
-    case 0x93: UnimplementedInstruction(state); break;
-    case 0x94: UnimplementedInstruction(state); break;
-    case 0x95: UnimplementedInstruction(state); break;
-    case 0x96: UnimplementedInstruction(state); break;
-    case 0x97: UnimplementedInstruction(state); break;
-    case 0x98: UnimplementedInstruction(state); break;
-    case 0x99: UnimplementedInstruction(state); break;
-    case 0x9a: UnimplementedInstruction(state); break;
-    case 0x9b: UnimplementedInstruction(state); break;
-    case 0x9c: UnimplementedInstruction(state); break;
-    case 0x9d: UnimplementedInstruction(state); break;
-    case 0x9e: UnimplementedInstruction(state); break;
-    case 0x9f: UnimplementedInstruction(state); break;
+    case 0x90: {
+      //SUB B
+      uint16_t answer = (uint16_t)state->a - (uint16_t)state->b;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x91: {
+      //SUB C
+      //The above can be condensed to this
+      uint16_t answer = (uint16_t)state->a - (uint16_t)state->c;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x92: {
+      //SUB D
+      uint16_t answer = (uint16_t)state->a - (uint16_t)state->d;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x93: {
+      //SUB E
+      uint16_t answer = (uint16_t)state->a - (uint16_t)state->e;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x94: {
+      //SUB H
+      uint16_t answer = (uint16_t)state->a - (uint16_t)state->h;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x95: {
+      //SUB L
+      uint16_t answer = (uint16_t)state->a - (uint16_t)state->l;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x96: {
+      //SUB M
+      uint16_t answer = (uint16_t)state->a - (uint16_t)ReadFromHL(state);
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x97: {
+      //SUB A
+      uint16_t answer = (uint16_t)state->a - (uint16_t)state->a;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x98: {
+      //SBB B
+      uint16_t answer = (uint16_t)state->a - (uint16_t)state->b - (uint16_t)state->cc.cy ;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x99: {
+      //SBB C
+      uint16_t answer = (uint16_t)state->a - (uint16_t)state->c - (uint16_t)state->cc.cy ;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x9a: {
+      //SBB D
+      uint16_t answer = (uint16_t)state->a - (uint16_t)state->d - (uint16_t)state->cc.cy ;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x9b: {
+      //SBB E
+      uint16_t answer = (uint16_t)state->a - (uint16_t)state->e - (uint16_t)state->cc.cy ;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x9c: {
+      //SBB H
+      uint16_t answer = (uint16_t)state->a - (uint16_t)state->h - (uint16_t)state->cc.cy ;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x9d: {
+      //SBB L
+      uint16_t answer = (uint16_t)state->a - (uint16_t)state->l - (uint16_t)state->cc.cy ;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x9e: {
+      //SBB M
+      uint16_t answer = (uint16_t)state->a - (uint16_t)ReadFromHL(state) - (uint16_t)state->cc.cy ;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
+    case 0x9f: {
+      //SBB A
+      uint16_t answer = (uint16_t)state->a - (uint16_t)state->a - (uint16_t)state->cc.cy ;
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
 
     case 0xa0: UnimplementedInstruction(state); break;
     case 0xa1: UnimplementedInstruction(state); break;
@@ -408,7 +569,7 @@ int Emulate8080Op(State8080 *state) {
   return 0;
 }
 
-int Disassemble8080Op(unsigned char* codebuffer, int pc) {
+static int Disassemble8080Op(unsigned char* codebuffer, int pc) {
     unsigned char *code = &codebuffer[pc];
     int opbytes = 1;
     printf("%04x ", pc);
