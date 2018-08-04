@@ -30,11 +30,24 @@ static void UnimplementedInstruction(State8080 *state) {
   exit(1);
 }
 
+static int parity(int x, int size) {
+  int i;
+  int p = 0;
+  x = (x & ((1 << size)-1));
+  for (i = 0; i < size; i++) {
+    if(x & 0x1) {
+      p++;
+    }
+    x = x >> 1;
+  }
+  return (0 == (p & 0x1));
+}
+
 static void ArithFlagsA(State8080 *state, uint16_t result) {
   state->cc.z = ((result & 0xff) == 0);
   state->cc.s = ((result & 0x80) != 0);
   state->cc.cy = (result > 0xff);
-  //state->cc.p = Parity(result & 0xff);
+  state->cc.p = parity(result & 0xff, 8);
 }
 
 static uint8_t ReadFromHL(State8080 *state) {
@@ -501,7 +514,11 @@ static int Emulate8080Op(State8080 *state) {
     case 0xc3: UnimplementedInstruction(state); break;
     case 0xc4: UnimplementedInstruction(state); break;
     case 0xc5: UnimplementedInstruction(state); break;
-    case 0xc6: UnimplementedInstruction(state); break;
+    case 0xc6: {
+      uint16_t answer = (uint16_t)state->a + (uint16_t)opcode[1];
+      ArithFlagsA(state, answer);
+      state->a = answer & 0xff;
+    }
     case 0xc7: UnimplementedInstruction(state); break;
     case 0xc8: UnimplementedInstruction(state); break;
     case 0xc9: UnimplementedInstruction(state); break;
