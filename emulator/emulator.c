@@ -510,8 +510,18 @@ static int Emulate8080Op(State8080 *state) {
 
     case 0xc0: UnimplementedInstruction(state); break;
     case 0xc1: UnimplementedInstruction(state); break;
-    case 0xc2: UnimplementedInstruction(state); break;
-    case 0xc3: UnimplementedInstruction(state); break;
+    case 0xc2: //JNZ Addr
+      //If zero flag = 0, set pc to next to items in opcode array, little endian
+      if(0==state->cc.z) {
+        state->pc = (opcode[2] << 2) | opcode[1];
+      } else {
+        state->pc += 2;
+      }
+      break;
+    case 0xc3:
+      //JMP address
+      state->pc = (opcode[2] << 2) | opcode[1];
+      break;
     case 0xc4: UnimplementedInstruction(state); break;
     case 0xc5: UnimplementedInstruction(state); break;
     case 0xc6: {
@@ -520,18 +530,51 @@ static int Emulate8080Op(State8080 *state) {
       state->a = answer & 0xff;
     }
     case 0xc7: UnimplementedInstruction(state); break;
-    case 0xc8: UnimplementedInstruction(state); break;
-    case 0xc9: UnimplementedInstruction(state); break;
-    case 0xca: UnimplementedInstruction(state); break;
+    case 0xc8: //RZ Addr
+      if (state->cc.z) {
+        state->pc = state->memory[state->sp] | (state->memory[state->sp+1] << 8);
+        state->sp += 2;
+      }
+      break;
+    case 0xc9:
+      //RET
+      //Set pc to value from stack (OR'ed together, low endian)
+      state->pc = state->memory[state->sp] | (state->memory[state->sp+1] << 8);
+      state->sp += 2;
+      break;
+    case 0xca: //JZ Addr
+      //If zero flag = 0, set pc to next to items in opcode array, little endian
+      if(state->cc.z) {
+        state->pc = (opcode[2] << 2) | opcode[1];
+      } else {
+        state->pc += 2;
+      }
+      break;
     case 0xcb: UnimplementedInstruction(state); break;
     case 0xcc: UnimplementedInstruction(state); break;
-    case 0xcd: UnimplementedInstruction(state); break;
+    case 0xcd:
+     {
+       //CALL address
+       uint16_t ret = state->pc + 2;
+       state->memory[state->sp - 1] = (ret >> 8) & 0xff;
+       state->memory[state->sp - 2] = (ret & 0xff);
+       state->sp = state->sp - 2;
+       state->pc = (opcode[2] >> 8) | opcode[1];
+     }
+     break;
     case 0xce: UnimplementedInstruction(state); break;
     case 0xcf: UnimplementedInstruction(state); break;
 
     case 0xd0: UnimplementedInstruction(state); break;
     case 0xd1: UnimplementedInstruction(state); break;
-    case 0xd2: UnimplementedInstruction(state); break;
+    case 0xd2:
+      //JNC
+      if (state->cc.cy == 0) {
+        state->pc = (opcode[2] << 8) | opcode[1];
+      } else {
+        state->pc += 2;
+      }
+      break;
     case 0xd3: UnimplementedInstruction(state); break;
     case 0xd4: UnimplementedInstruction(state); break;
     case 0xd5: UnimplementedInstruction(state); break;
@@ -539,7 +582,14 @@ static int Emulate8080Op(State8080 *state) {
     case 0xd7: UnimplementedInstruction(state); break;
     case 0xd8: UnimplementedInstruction(state); break;
     case 0xd9: UnimplementedInstruction(state); break;
-    case 0xda: UnimplementedInstruction(state); break;
+    case 0xda:
+      //JC
+      if (state->cc.cy != 0) {
+        state->pc = (opcode[2] << 8) | opcode[1];
+      } else {
+        state->pc += 2;
+      }
+      break;
     case 0xdb: UnimplementedInstruction(state); break;
     case 0xdc: UnimplementedInstruction(state); break;
     case 0xdd: UnimplementedInstruction(state); break;
@@ -548,7 +598,14 @@ static int Emulate8080Op(State8080 *state) {
 
     case 0xe0: UnimplementedInstruction(state); break;
     case 0xe1: UnimplementedInstruction(state); break;
-    case 0xe2: UnimplementedInstruction(state); break;
+    case 0xe2:
+      //JPO
+      if (state->cc.p == 0) {
+        state->pc = (opcode[2] << 8) | opcode[1];
+      } else {
+        state->pc += 2;
+      }
+      break;
     case 0xe3: UnimplementedInstruction(state); break;
     case 0xe4: UnimplementedInstruction(state); break;
     case 0xe5: UnimplementedInstruction(state); break;
@@ -556,7 +613,14 @@ static int Emulate8080Op(State8080 *state) {
     case 0xe7: UnimplementedInstruction(state); break;
     case 0xe8: UnimplementedInstruction(state); break;
     case 0xe9: UnimplementedInstruction(state); break;
-    case 0xea: UnimplementedInstruction(state); break;
+    case 0xea:
+      //JPE
+      if (state->cc.p != 0) {
+        state->pc = (opcode[2] << 8) | opcode[1];
+      } else {
+        state->pc += 2;
+      }
+      break;
     case 0xeb: UnimplementedInstruction(state); break;
     case 0xec: UnimplementedInstruction(state); break;
     case 0xed: UnimplementedInstruction(state); break;
@@ -565,7 +629,14 @@ static int Emulate8080Op(State8080 *state) {
 
     case 0xf0: UnimplementedInstruction(state); break;
     case 0xf1: UnimplementedInstruction(state); break;
-    case 0xf2: UnimplementedInstruction(state); break;
+    case 0xf2:
+      //JP
+      if (state->cc.s == 0) {
+        state->pc = (opcode[2] << 8) | opcode[1];
+      } else {
+        state->pc += 2;
+      }
+      break;
     case 0xf3: UnimplementedInstruction(state); break;
     case 0xf4: UnimplementedInstruction(state); break;
     case 0xf5: UnimplementedInstruction(state); break;
@@ -573,7 +644,14 @@ static int Emulate8080Op(State8080 *state) {
     case 0xf7: UnimplementedInstruction(state); break;
     case 0xf8: UnimplementedInstruction(state); break;
     case 0xf9: UnimplementedInstruction(state); break;
-    case 0xfa: UnimplementedInstruction(state); break;
+    case 0xfa:
+    //JM
+    if (state->cc.s != 0) {
+      state->pc = (opcode[2] << 8) | opcode[1];
+    } else {
+      state->pc += 2;
+    }
+    break;
     case 0xfb: UnimplementedInstruction(state); break;
     case 0xfc: UnimplementedInstruction(state); break;
     case 0xfd: UnimplementedInstruction(state); break;
