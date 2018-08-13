@@ -30,6 +30,18 @@ static void UnimplementedInstruction(State8080 *state) {
   exit(1);
 }
 
+static void WriteMem(State8080 *state, uint16_t address, uint8_t value) {
+  if(address < 0x2000) {
+    printf("writing to address < 0x2000 is not allowed\n");
+    return;
+  }
+  if (address >= 0x4000) {
+    printf("writing to address >= 0x4000 is not allowed\n");
+    return;
+  }
+  state->memory[address] = value;
+}
+
 static int parity(int x, int size) {
   int i;
   int p = 0;
@@ -58,6 +70,9 @@ static uint8_t ReadFromHL(State8080 *state) {
 
 static int Emulate8080Op(State8080 *state) {
   //fetch the current opcode from memory
+  //opcode can be between 0x00 & 0xFF
+  //or 0 - 255
+
   unsigned char *opcode = &state->memory[state->pc];
 
   switch (*opcode) {
@@ -508,7 +523,13 @@ static int Emulate8080Op(State8080 *state) {
     case 0xbe: UnimplementedInstruction(state); break;
     case 0xbf: UnimplementedInstruction(state); break;
 
-    case 0xc0: UnimplementedInstruction(state); break;
+    case 0xc0:
+      //RNZ
+      if (state->cc.z == 0) {
+        state->pc = state->memory[state->sp] | (state->memory[state->sp+1] << 8);
+        state->sp += 2;
+      }
+      break;
     case 0xc1: UnimplementedInstruction(state); break;
     case 0xc2: //JNZ Addr
       //If zero flag = 0, set pc to next to items in opcode array, little endian
@@ -576,7 +597,62 @@ static int Emulate8080Op(State8080 *state) {
       }
       break;
     case 0xd3: UnimplementedInstruction(state); break;
-    case 0xd4: UnimplementedInstruction(state); break;
+    case 0xd4:
+      //CNC
+      if (state->cc.cy == 0) {
+        //Get return address
+        uint16_t ret = state->pc + 2;
+          /*
+          save pc return value in memory
+
+          These two lines basically does the opposite of the description below
+          so, take the uint16_t ret value from the pc, and decompose.
+          By shifting it 8 bits right and AND it together with 0xff, we get the top part of the address.
+          The lover part we get by ANDing it together with 0xff.
+
+          Example:
+
+          1111 0000 0001 0001
+          >> 8 = 0000 0000 1111 0000
+          AND with 0xff,   1111 1111
+          gives us         1111 0000
+
+          1111 0000 0001 0001
+          AND with  1111 1111
+          gives us  0001 0001
+
+          so, the return address is decomposed into two values which are stored in
+          memory at sp-1 & sp-2
+          */
+          WriteMem(state, state->sp-1, (ret >> 8) & 0xff);
+          WriteMem(state, state->sp-2, (ret & 0xff));
+        //then we rewind sp by 2
+        state->sp = state->sp - 2;
+        /*
+          so, opcodes can be between 0x00 & 0xFF,
+          in binay 0000 0000 and 1111 1111
+          so, lets say
+          opcode[2] = 0xF0 = 1111 0000
+          opcode[1] = 0x11   0001 0001
+
+          opcode[2] << 8 (stored in uint16_t) = 1111 0000 0000 0000
+          ORed together with 0001 0001 gives us
+
+          1111 0000 0001 0001
+
+          So, the below line takes the values of opcode[2] and opcode[1]
+          and combine them into a memoryaddress, starting with 2 as this
+          is little endian
+
+          the pc is set to that memory address.
+
+          So, this function jumps to the value stored on the sp
+        */
+        state->pc = (opcode[2] << 8 | opcode[1]);
+      } else {
+        state->pc += 2;
+      }
+      break;
     case 0xd5: UnimplementedInstruction(state); break;
     case 0xd6: UnimplementedInstruction(state); break;
     case 0xd7: UnimplementedInstruction(state); break;
@@ -591,7 +667,19 @@ static int Emulate8080Op(State8080 *state) {
       }
       break;
     case 0xdb: UnimplementedInstruction(state); break;
-    case 0xdc: UnimplementedInstruction(state); break;
+    case 0xdc:
+      //CC
+      //Same as 0xd4, just checking if cy != 0
+      if(state->cc.cy != 0) {
+        uint16_t ret = state->pc + 2;
+          WriteMem(state, state->sp-1, (ret >> 8) & 0xff);
+          WriteMem(state, state->sp-2, (ret & 0xff));
+        state->sp = state->sp - 2;
+        state->pc = (opcode[2] << 8 | opcode[1]);
+      } else {
+        state->pc += 2;
+      }
+     break;
     case 0xdd: UnimplementedInstruction(state); break;
     case 0xde: UnimplementedInstruction(state); break;
     case 0xdf: UnimplementedInstruction(state); break;
